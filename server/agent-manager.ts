@@ -72,9 +72,9 @@ export class AgentManager extends EventEmitter {
       ? list.filter(
           (ref) =>
             ref.id === 'Main' ||
-            (ref.sessionFile && mainDir && dirname(ref.sessionFile) === mainDir)
+            (ref.sessionFile != null && dirname(ref.sessionFile) === mainDir)
         )
-      : list;
+      : list.filter((ref) => ref.id === 'Main');
 
     return filtered.map((ref) => ({
       id: ref.id,
@@ -114,10 +114,8 @@ export class AgentManager extends EventEmitter {
   }
 
   async switchToSession(path: string, cwd: string): Promise<void> {
-    if (this.mainSession) {
-      await this.mainSession.dispose();
-    }
-    this.registry.unregister('Main');
+    const oldSession = this.mainSession;
+    const oldMainRef = this.registry.get('Main');
 
     const sessionManager = await SessionManager.open(path, undefined, undefined, {
       initialCwd: cwd,
@@ -127,6 +125,13 @@ export class AgentManager extends EventEmitter {
       cwd,
       sessionManager,
     });
+
+    if (oldSession) {
+      await oldSession.dispose();
+    }
+    if (oldMainRef) {
+      this.registry.unregister('Main', oldMainRef);
+    }
 
     this.mainSession = session;
     this.cwd = cwd;
