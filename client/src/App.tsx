@@ -12,6 +12,7 @@ export function App() {
   const [spawnTask, setSpawnTask] = useState('');
   const [showSessionBrowser, setShowSessionBrowser] = useState(false);
   const activeAgent = roster.find(r => r.id === activeTab);
+  const activeMessages = messages[activeTab] || [];
 
   const handleSendPrompt = () => {
     if (!input.trim()) return;
