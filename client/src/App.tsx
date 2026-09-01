@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSwitchboard } from './useSwitchboard.ts';
 
 export function App() {
-  const { connected, roster, models, messages, send } = useSwitchboard();
+  const { connected, roster, models, messages, errors, clearErrors, send } = useSwitchboard();
   const [activeTab, setActiveTab] = useState<string>('Main');
   const [input, setInput] = useState('');
   const [spawnAgent, setSpawnAgent] = useState('scout');
@@ -14,6 +14,16 @@ export function App() {
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'sans-serif' }}>
       <div style={{ flex: 1, padding: '1rem', borderRight: '1px solid #ccc', display: 'flex', flexDirection: 'column' }}>
+        {errors && errors.length > 0 && (
+          <div style={{ padding: '0.5rem 1rem', marginBottom: '1rem', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              {errors.map((err, i) => (
+                <div key={i}>{err}</div>
+              ))}
+            </div>
+            <button onClick={clearErrors} style={{ marginLeft: '1rem' }}>Dismiss</button>
+          </div>
+        )}
         <h2>{activeTab === 'Main' ? 'Main Orchestrator' : `Subagent: ${activeAgent?.displayName}`} {!connected && '(Disconnected)'}</h2>
 
         {activeTab !== 'Main' && (

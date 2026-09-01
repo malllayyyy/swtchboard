@@ -5,6 +5,7 @@ export function useSwitchboard() {
   const [roster, setRoster] = useState<AgentRosterItem[]>([]);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [messages, setMessages] = useState<Record<string, any[]>>({});
+  const [errors, setErrors] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const ws = useRef<WebSocket | null>(null);
 
@@ -26,8 +27,15 @@ export function useSwitchboard() {
           [msg.target]: [...(prev[msg.target] || []), { isEvent: true, data: msg.event }]
         }));
       }
+      if (msg.type === 'error') {
+        setErrors(prev => [...prev, msg.message]);
+      }
     };
     return () => socket.close();
+  }, []);
+
+  const clearErrors = useCallback(() => {
+    setErrors([]);
   }, []);
 
   const send = useCallback((msg: ClientMessage) => {
@@ -36,5 +44,5 @@ export function useSwitchboard() {
     }
   }, []);
 
-  return { roster, models, messages, connected, send };
+  return { roster, models, messages, errors, clearErrors, connected, send };
 }

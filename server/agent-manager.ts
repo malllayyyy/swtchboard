@@ -10,7 +10,7 @@ import type { AgentRosterItem, ModelInfo } from '../shared/protocol';
 export class AgentManager extends EventEmitter {
   public registry = new AgentRegistry();
   public mainSession!: AgentSession;
-  private subscribedSessions = new Set<string>();
+  private subscribedSessions = new WeakSet<AgentSession>();
 
   constructor(public cwd: string) {
     super();
@@ -40,8 +40,8 @@ export class AgentManager extends EventEmitter {
 
   private subscribeToNewSessions(): void {
     for (const ref of this.registry.list()) {
-      if (ref.session && !this.subscribedSessions.has(ref.id)) {
-        this.subscribedSessions.add(ref.id);
+      if (ref.session && !this.subscribedSessions.has(ref.session)) {
+        this.subscribedSessions.add(ref.session);
         const agentId = ref.id;
         ref.session.subscribe((event) => {
           this.emit('session_event', agentId, event);
