@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, spyOn, test } from 'bun:test';
 import { AgentManager } from './agent-manager';
 
 test('AgentManager initializes and returns models list', async () => {
@@ -55,4 +55,38 @@ test('switchToSession preserves mainSession on failure', async () => {
   // mainSession and registry entry for Main should be intact
   expect(manager.mainSession).toBe(initialSession);
   expect(manager.registry.get('Main')?.session).toBe(initialSession);
+});
+test('switchToSession repairs registry Main entry if createAgentSession throws after SessionManager.open succeeds', async () => {
+  const manager = new AgentManager(process.cwd());
+  await manager.init();
+  const initialSession = manager.mainSession;
+  expect(initialSession).toBeDefined();
+  expect(manager.registry.get('Main')?.session).toBe(initialSession);
+
+  const SessionManagerModule = await import('@oh-my-pi/pi-coding-agent');
+  const openSpy = spyOn(SessionManagerModule.SessionManager, 'open').mockImplementation(async () => {
+    return {} as unknown as SessionManagerModule.SessionManager;
+  });
+
+  const createSpy = spyOn(SessionManagerModule, 'createAgentSession').mockImplementation(async () => {
+    // Simulate SDK internal step corrupting registry Main entry before failing (unregistering or setting fake session)
+    manager.registry.register({
+      id: 'Main',
+      displayName: 'Main',
+      kind: 'main',
+      session: {} as unknown as SessionManagerModule.AgentSession,
+    });
+    throw new Error('Extension init failure');
+  });
+
+  try {
+    await expect(manager.switchToSession('some-path.jsonl', process.cwd())).rejects.toThrow('Extension init failure');
+
+    // Verify mainSession is unchanged and registry entry for Main was repaired to point at initialSession
+    expect(manager.mainSession).toBe(initialSession);
+    expect(manager.registry.get('Main')?.session).toBe(initialSession);
+  } finally {
+    openSpy.mockRestore();
+    createSpy.mockRestore();
+  }
 });

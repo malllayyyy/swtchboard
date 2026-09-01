@@ -121,10 +121,25 @@ export class AgentManager extends EventEmitter {
       initialCwd: cwd,
     });
 
-    const { session } = await createAgentSession({
-      cwd,
-      sessionManager,
-    });
+    let session: AgentSession;
+    try {
+      const res = await createAgentSession({
+        cwd,
+        sessionManager,
+      });
+      session = res.session;
+    } catch (err) {
+      if (this.registry.get('Main')?.session !== this.mainSession) {
+        this.registry.register({
+          id: 'Main',
+          displayName: this.registry.get('Main')?.displayName ?? 'Main',
+          kind: 'main',
+          session: this.mainSession,
+          sessionFile: this.mainSession.sessionFile ?? null,
+        });
+      }
+      throw err;
+    }
 
     if (oldSession) {
       await oldSession.dispose();
