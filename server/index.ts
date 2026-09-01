@@ -122,6 +122,23 @@ wss.on('connection', (ws) => {
             );
           });
         }
+      } else if (msg.type === 'list_sessions') {
+        const sessions = await manager.listAllSessions();
+        ws.send(
+          JSON.stringify({
+            type: 'sessions',
+            sessions,
+          })
+        );
+      } else if (msg.type === 'switch_session') {
+        await manager.switchToSession(msg.path, msg.cwd);
+        broadcast({ type: 'models', models: manager.getModels() });
+        broadcast({ type: 'roster', roster: manager.getRoster() });
+        broadcast({
+          type: 'session_messages',
+          target: 'Main',
+          messages: manager.mainSession?.messages || [],
+        });
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -144,6 +161,10 @@ export async function startServer(port = 4000, host = '127.0.0.1') {
 
   manager.on('session_event', (target, event) => {
     broadcast({ type: 'session_event', target, event });
+  });
+
+  manager.on('session_switched', ({ cwd, path }) => {
+    broadcast({ type: 'session_switched', cwd, path });
   });
 
   return new Promise<{ server: typeof server; wss: typeof wss; manager: typeof manager }>((resolve) => {
