@@ -95,6 +95,7 @@ export function App() {
               loading={loadingSessions}
               onSelectSession={(s) => {
                 send({ type: 'switch_session', path: s.path, cwd: s.cwd });
+                setActiveTab('Main');
                 setShowSessionBrowser(false);
               }}
               onClose={() => setShowSessionBrowser(false)}
