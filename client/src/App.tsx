@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { useSwitchboard } from './useSwitchboard.ts';
 import { MessageView, AgentMessage } from './MessageView.tsx';
+import { SessionBrowser } from './SessionBrowser.tsx';
 import './App.css';
 
 export function App() {
-  const { connected, roster, models, messages, errors, clearErrors, send } = useSwitchboard();
+  const { connected, roster, models, messages, sessions, loadingSessions, listSessions, errors, clearErrors, send } = useSwitchboard();
   const [activeTab, setActiveTab] = useState<string>('Main');
   const [input, setInput] = useState('');
   const [spawnAgent, setSpawnAgent] = useState('scout');
   const [spawnTask, setSpawnTask] = useState('');
-
-  const activeMessages: AgentMessage[] = messages[activeTab] || [];
+  const [showSessionBrowser, setShowSessionBrowser] = useState(false);
   const activeAgent = roster.find(r => r.id === activeTab);
 
   const handleSendPrompt = () => {
@@ -31,14 +31,29 @@ export function App() {
       <header className="app-header">
         <div className="header-left">
           <h1 className="header-title">
-            {activeTab === 'Main' ? 'Main Orchestrator' : `Agent: ${activeAgent?.displayName || activeTab}`}
+            {showSessionBrowser
+              ? 'Session Browser'
+              : activeTab === 'Main'
+              ? 'Main Orchestrator'
+              : `Agent: ${activeAgent?.displayName || activeTab}`}
           </h1>
           <span className="status-badge">
             <span className={`status-dot ${connected ? 'connected' : 'disconnected'}`} />
             {connected ? 'Connected' : 'Disconnected'}
           </span>
+          <button
+            className={`header-sessions-btn ${showSessionBrowser ? 'active' : ''}`}
+            onClick={() => {
+              const next = !showSessionBrowser;
+              setShowSessionBrowser(next);
+              if (next) {
+                listSessions();
+              }
+            }}
+          >
+            Sessions
+          </button>
         </div>
-
         <div className="header-right">
           {activeTab !== 'Main' && (
             <select
@@ -73,31 +88,44 @@ export function App() {
               <button onClick={clearErrors} className="error-banner-btn">Dismiss</button>
             </div>
           )}
-
-          <div className="chat-messages">
-            {activeMessages.length === 0 ? (
-              <div className="empty-chat">No messages yet for target "{activeTab}".</div>
-            ) : (
-              activeMessages.map((m, i) => (
-                <MessageView key={i} message={m} />
-              ))
-            )}
-          </div>
-
-          <div className="chat-input-bar">
-            <input
-              className="chat-input"
-              placeholder={`Message ${activeTab}...`}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleSendPrompt();
+          {showSessionBrowser ? (
+            <SessionBrowser
+              sessions={sessions}
+              loading={loadingSessions}
+              onSelectSession={(s) => {
+                send({ type: 'switch_session', path: s.path, cwd: s.cwd });
+                setShowSessionBrowser(false);
               }}
+              onClose={() => setShowSessionBrowser(false)}
             />
-            <button onClick={handleSendPrompt} className="chat-send-btn">
-              Send
-            </button>
-          </div>
+          ) : (
+            <>
+              <div className="chat-messages">
+                {activeMessages.length === 0 ? (
+                  <div className="empty-chat">No messages yet for target "{activeTab}".</div>
+                ) : (
+                  activeMessages.map((m, i) => (
+                    <MessageView key={i} message={m} />
+                  ))
+                )}
+              </div>
+
+              <div className="chat-input-bar">
+                <input
+                  className="chat-input"
+                  placeholder={`Message ${activeTab}...`}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSendPrompt();
+                  }}
+                />
+                <button onClick={handleSendPrompt} className="chat-send-btn">
+                  Send
+                </button>
+              </div>
+            </>
+          )}
         </section>
 
         {/* Right Roster Sidebar */}

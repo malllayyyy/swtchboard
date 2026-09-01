@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import type { ServerMessage, ClientMessage, AgentRosterItem, ModelInfo } from '../../shared/protocol.ts';
+import type { ServerMessage, ClientMessage, AgentRosterItem, ModelInfo, SessionSummary } from '../../shared/protocol.ts';
 import type { AgentMessage, ContentBlock } from './MessageView.tsx';
 
 export interface InProgressMessage {
@@ -10,6 +10,8 @@ export interface InProgressMessage {
 export function useSwitchboard() {
   const [roster, setRoster] = useState<AgentRosterItem[]>([]);
   const [models, setModels] = useState<ModelInfo[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState<boolean>(false);
   const [messages, setMessages] = useState<Record<string, AgentMessage[]>>({});
   const [inProgressMessages, setInProgressMessages] = useState<Record<string, InProgressMessage>>({});
   const [errors, setErrors] = useState<string[]>([]);
@@ -26,6 +28,16 @@ export function useSwitchboard() {
       const msg = JSON.parse(e.data) as ServerMessage;
       if (msg.type === 'roster') setRoster(msg.roster);
       if (msg.type === 'models') setModels(msg.models);
+      if (msg.type === 'sessions') {
+        setSessions(msg.sessions);
+        setLoadingSessions(false);
+      }
+      if (msg.type === 'session_switched') {
+        setMessages({});
+        setRoster([]);
+        setInProgressMessages({});
+        inProgressRef.current = {};
+      }
       if (msg.type === 'session_messages') {
         const target = msg.target;
         const loadedMessages = (msg.messages || []) as AgentMessage[];
@@ -168,6 +180,11 @@ export function useSwitchboard() {
     }
   }, []);
 
+  const listSessions = useCallback(() => {
+    setLoadingSessions(true);
+    send({ type: 'list_sessions' });
+  }, [send]);
+
   const combinedMessages = useMemo(() => {
     const result: Record<string, AgentMessage[]> = {};
     const allTargets = new Set([...Object.keys(messages), ...Object.keys(inProgressMessages)]);
@@ -183,5 +200,5 @@ export function useSwitchboard() {
     return result;
   }, [messages, inProgressMessages]);
 
-  return { roster, models, messages: combinedMessages, errors, clearErrors, connected, send };
+  return { roster, models, messages: combinedMessages, sessions, loadingSessions, listSessions, errors, clearErrors, connected, send };
 }
