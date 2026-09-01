@@ -8,7 +8,7 @@ import {
 import type { AgentRosterItem, ModelInfo } from '../shared/protocol';
 
 export class AgentManager extends EventEmitter {
-  public registry = new AgentRegistry();
+  public registry = AgentRegistry.global();
   public mainSession!: AgentSession;
   private subscribedSessions = new WeakSet<AgentSession>();
 
@@ -27,7 +27,6 @@ export class AgentManager extends EventEmitter {
     const { session } = await createAgentSession({
       cwd: this.cwd,
       sessionManager,
-      agentRegistry: this.registry,
     });
     this.mainSession = session;
 
