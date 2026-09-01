@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useSwitchboard } from './useSwitchboard.ts';
+import { MessageView, AgentMessage } from './MessageView.tsx';
+import './App.css';
 
 export function App() {
   const { connected, roster, models, messages, errors, clearErrors, send } = useSwitchboard();
@@ -8,68 +10,163 @@ export function App() {
   const [spawnAgent, setSpawnAgent] = useState('scout');
   const [spawnTask, setSpawnTask] = useState('');
 
-  const activeMessages = messages[activeTab] || [];
+  const activeMessages: AgentMessage[] = messages[activeTab] || [];
   const activeAgent = roster.find(r => r.id === activeTab);
 
+  const handleSendPrompt = () => {
+    if (!input.trim()) return;
+    send({ type: 'prompt', target: activeTab, text: input });
+    setInput('');
+  };
+
+  const handleSpawn = () => {
+    if (!spawnTask.trim()) return;
+    send({ type: 'spawn', agent: spawnAgent, task: spawnTask });
+    setSpawnTask('');
+  };
+
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'sans-serif' }}>
-      <div style={{ flex: 1, padding: '1rem', borderRight: '1px solid #ccc', display: 'flex', flexDirection: 'column' }}>
-        {errors && errors.length > 0 && (
-          <div style={{ padding: '0.5rem 1rem', marginBottom: '1rem', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              {errors.map((err, i) => (
-                <div key={i}>{err}</div>
-              ))}
-            </div>
-            <button onClick={clearErrors} style={{ marginLeft: '1rem' }}>Dismiss</button>
-          </div>
-        )}
-        <h2>{activeTab === 'Main' ? 'Main Orchestrator' : `Subagent: ${activeAgent?.displayName}`} {!connected && '(Disconnected)'}</h2>
+    <div className="app-container">
+      {/* Top Header */}
+      <header className="app-header">
+        <div className="header-left">
+          <h1 className="header-title">
+            {activeTab === 'Main' ? 'Main Orchestrator' : `Agent: ${activeAgent?.displayName || activeTab}`}
+          </h1>
+          <span className="status-badge">
+            <span className={`status-dot ${connected ? 'connected' : 'disconnected'}`} />
+            {connected ? 'Connected' : 'Disconnected'}
+          </span>
+        </div>
 
-        {activeTab !== 'Main' && (
-          <div style={{ marginBottom: '1rem' }}>
-            <select onChange={(e) => send({ type: 'set_model', target: activeTab, provider: '', modelId: e.target.value })}>
+        <div className="header-right">
+          {activeTab !== 'Main' && (
+            <select
+              className="model-select"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  send({ type: 'set_model', target: activeTab, provider: '', modelId: e.target.value });
+                }
+              }}
+            >
               <option value="">Switch Model...</option>
-              {models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
+              {models.map(m => (
+                <option key={m.id} value={m.id}>{m.id}</option>
+              ))}
             </select>
-          </div>
-        )}
+          )}
+        </div>
+      </header>
 
-        <div style={{ flex: 1, overflowY: 'auto', background: '#f5f5f5', padding: '1rem', marginBottom: '1rem' }}>
-          {activeMessages.map((m, i) => (
-            <div key={i} style={{ padding: '0.5rem', borderBottom: '1px solid #ddd' }}>
-              {m.isEvent ? <pre style={{fontSize: '0.8em', color: 'gray'}}>{JSON.stringify(m.data)}</pre> : <pre>{JSON.stringify(m)}</pre>}
+      {/* Main Container */}
+      <div className="app-main">
+        {/* Left Chat Pane */}
+        <section className="chat-pane">
+          {errors && errors.length > 0 && (
+            <div className="error-banner">
+              <div>
+                {errors.map((err, i) => (
+                  <div key={i}>{err}</div>
+                ))}
+              </div>
+              <button onClick={clearErrors} className="error-banner-btn">Dismiss</button>
             </div>
-          ))}
-        </div>
+          )}
 
-        <div style={{ display: 'flex' }}>
-          <input style={{flex: 1}} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => {
-            if (e.key === 'Enter') { send({ type: 'prompt', target: activeTab, text: input }); setInput(''); }
-          }} />
-          <button onClick={() => { send({ type: 'prompt', target: activeTab, text: input }); setInput(''); }}>Send</button>
-        </div>
-      </div>
-
-      <div style={{ width: '300px', padding: '1rem', overflowY: 'auto' }}>
-        <h3>Roster</h3>
-        <div onClick={() => setActiveTab('Main')} style={{ padding: '1rem', cursor: 'pointer', border: '1px solid #000', marginBottom: '0.5rem', background: activeTab === 'Main' ? '#eee' : '#fff' }}>
-          <strong>Main Orchestrator</strong>
-        </div>
-
-        {roster.filter(r => r.id !== 'Main').map(r => (
-          <div key={r.id} onClick={() => setActiveTab(r.id)} style={{ padding: '1rem', cursor: 'pointer', border: '1px solid #ccc', marginBottom: '0.5rem', background: activeTab === r.id ? '#eee' : '#fff' }}>
-            <strong>{r.displayName}</strong> <br/>
-            <small>{r.status} | {r.model} | ${(r.cost || 0).toFixed(4)}</small><br/>
-            <small>{r.activity}</small>
+          <div className="chat-messages">
+            {activeMessages.length === 0 ? (
+              <div className="empty-chat">No messages yet for target "{activeTab}".</div>
+            ) : (
+              activeMessages.map((m, i) => (
+                <MessageView key={i} message={m} />
+              ))
+            )}
           </div>
-        ))}
 
-        <hr />
-        <h4>Spawn Subagent</h4>
-        <input placeholder="agent type (e.g. scout)" value={spawnAgent} onChange={e => setSpawnAgent(e.target.value)} style={{width: '100%', marginBottom: '0.5rem'}} />
-        <textarea placeholder="task" value={spawnTask} onChange={e => setSpawnTask(e.target.value)} style={{width: '100%', marginBottom: '0.5rem'}} />
-        <button onClick={() => { send({ type: 'spawn', agent: spawnAgent, task: spawnTask }); setSpawnTask(''); }} style={{width: '100%'}}>Spawn (via Main)</button>
+          <div className="chat-input-bar">
+            <input
+              className="chat-input"
+              placeholder={`Message ${activeTab}...`}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSendPrompt();
+              }}
+            />
+            <button onClick={handleSendPrompt} className="chat-send-btn">
+              Send
+            </button>
+          </div>
+        </section>
+
+        {/* Right Roster Sidebar */}
+        <aside className="roster-pane">
+          <div className="roster-title">ROSTER</div>
+          <div className="roster-cards">
+            {/* Main Orchestrator Card */}
+            <div
+              className={`roster-card ${activeTab === 'Main' ? 'active' : ''}`}
+              onClick={() => setActiveTab('Main')}
+            >
+              <div className="card-header">
+                <span className="card-name">Main Orchestrator</span>
+                <span className="status-dot connected" title="Active" />
+              </div>
+              <div className="card-details">
+                <span>Target ID: Main</span>
+              </div>
+            </div>
+
+            {/* Subagent Cards */}
+            {roster.filter(r => r.id !== 'Main').map(r => {
+              const isRunning = r.status?.toLowerCase() === 'running';
+              return (
+                <div
+                  key={r.id}
+                  className={`roster-card ${activeTab === r.id ? 'active' : ''}`}
+                  onClick={() => setActiveTab(r.id)}
+                >
+                  <div className="card-header">
+                    <span className="card-name">{r.displayName}</span>
+                    <span
+                      className={`status-dot ${isRunning ? 'connected' : 'disconnected'}`}
+                      style={!isRunning ? { backgroundColor: 'var(--status-gray)' } : undefined}
+                      title={r.status}
+                    />
+                  </div>
+                  <div className="card-details">
+                    <span>{r.status || 'idle'} {r.model ? `| ${r.model}` : ''}</span>
+                    <span>Cost: ${(r.cost || 0).toFixed(4)} {r.tokens !== undefined ? `| ${r.tokens} tokens` : ''}</span>
+                    {r.activity && <div className="card-activity" title={r.activity}>{r.activity}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <hr className="divider" />
+
+          {/* Spawn Form */}
+          <div className="spawn-section">
+            <div className="roster-title">SPAWN SUBAGENT</div>
+            <input
+              className="spawn-input"
+              placeholder="agent type (e.g. scout)"
+              value={spawnAgent}
+              onChange={e => setSpawnAgent(e.target.value)}
+            />
+            <textarea
+              className="spawn-textarea"
+              placeholder="task description"
+              value={spawnTask}
+              onChange={e => setSpawnTask(e.target.value)}
+            />
+            <button onClick={handleSpawn} className="spawn-btn">
+              Spawn (via Main)
+            </button>
+          </div>
+        </aside>
       </div>
     </div>
   );
