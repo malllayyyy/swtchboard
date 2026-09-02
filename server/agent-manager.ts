@@ -20,6 +20,7 @@ export class AgentManager extends EventEmitter {
   public mainSession!: AgentSession;
   private rootSessionFile: string | undefined;
   private subscribedSessions = new WeakSet<AgentSession>();
+  private rosterRefreshTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(public cwd: string) {
     super();
@@ -54,6 +55,22 @@ export class AgentManager extends EventEmitter {
       this.subscribeToNewSessions();
     });
     this.subscribeToNewSessions();
+    this.startRosterRefresh();
+  }
+
+  private startRosterRefresh(): void {
+    if (this.rosterRefreshTimer) {
+      clearInterval(this.rosterRefreshTimer);
+    }
+    this.rosterRefreshTimer = setInterval(async () => {
+      try {
+        await ensurePersistedRoster(this.registry, this.mainSession.sessionFile);
+        this.subscribeToNewSessions();
+        this.emit('roster_update', this.getRoster());
+      } catch (err) {
+        console.warn('Periodic roster refresh failed:', err);
+      }
+    }, 12000);
   }
 
   private subscribeToNewSessions(): void {
@@ -88,6 +105,7 @@ export class AgentManager extends EventEmitter {
         cost: ref.history?.metrics?.cost,
         tokens: ref.history?.metrics?.tokens,
         activity: ref.activity,
+        lastActivity: ref.lastActivity,
       }));
   }
 
@@ -166,6 +184,7 @@ export class AgentManager extends EventEmitter {
     }
 
     this.subscribeToNewSessions();
+    this.startRosterRefresh();
     this.emit('session_switched', { cwd, path });
   }
 

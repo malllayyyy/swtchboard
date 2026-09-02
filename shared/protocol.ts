@@ -2,6 +2,7 @@ export interface ModelInfo { id: string; provider: string; }
 export interface AgentRosterItem {
   id: string; displayName: string; status: string;
   model?: string; cost?: number; tokens?: number; activity?: string;
+  lastActivity?: number;
 }
 
 export interface SessionSummary {

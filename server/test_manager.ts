@@ -48,6 +48,8 @@ test('AgentManager getRoster includes subagents in artifacts directory and exclu
     expect(ids).toContain('Main');
     expect(ids).toContain('SubAgent1');
     expect(ids).not.toContain('OtherSubAgent');
+    const mainItem = roster.find((r) => r.id === 'Main');
+    expect(typeof mainItem?.lastActivity).toBe('number');
   } finally {
     manager.registry.unregister('SubAgent1');
     manager.registry.unregister('OtherSubAgent');
@@ -100,5 +102,26 @@ test('switchToSession repairs registry Main entry if createAgentSession throws a
   } finally {
     openSpy.mockRestore();
     createSpy.mockRestore();
+  }
+});
+test('AgentManager startRosterRefresh clears previous timer when called twice', async () => {
+  const manager = new AgentManager(process.cwd());
+  await manager.init();
+
+  const firstTimer = (manager as any).rosterRefreshTimer;
+  expect(firstTimer).toBeDefined();
+
+  const clearIntervalSpy = spyOn(globalThis, 'clearInterval');
+  try {
+    (manager as any).startRosterRefresh();
+    const secondTimer = (manager as any).rosterRefreshTimer;
+    expect(secondTimer).toBeDefined();
+    expect(secondTimer).not.toBe(firstTimer);
+    expect(clearIntervalSpy).toHaveBeenCalledWith(firstTimer);
+  } finally {
+    clearIntervalSpy.mockRestore();
+    if ((manager as any).rosterRefreshTimer) {
+      clearInterval((manager as any).rosterRefreshTimer);
+    }
   }
 });
