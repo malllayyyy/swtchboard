@@ -6,6 +6,7 @@ import {
   createAgentSession,
   SessionManager,
 } from '@oh-my-pi/pi-coding-agent';
+import { ensurePersistedRoster } from '@oh-my-pi/pi-coding-agent/registry/persisted-agents';
 import type {
   AgentRosterItem,
   ModelInfo,
@@ -34,6 +35,12 @@ export class AgentManager extends EventEmitter {
       sessionManager,
     });
     this.mainSession = session;
+
+    try {
+      await ensurePersistedRoster(this.registry, this.mainSession.sessionFile);
+    } catch (err) {
+      console.warn('Failed to hydrate persisted subagent roster:', err);
+    }
 
     this.registry.onChange(() => {
       this.emit('roster_update', this.getRoster());
@@ -150,6 +157,12 @@ export class AgentManager extends EventEmitter {
 
     this.mainSession = session;
     this.cwd = cwd;
+
+    try {
+      await ensurePersistedRoster(this.registry, session.sessionFile);
+    } catch (err) {
+      console.warn('Failed to hydrate persisted subagent roster:', err);
+    }
 
     this.subscribeToNewSessions();
     this.emit('session_switched', { cwd, path });
