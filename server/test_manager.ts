@@ -15,31 +15,43 @@ test('AgentManager listAllSessions returns session summaries', async () => {
   expect(Array.isArray(sessions)).toBe(true);
 });
 
-test('AgentManager getRoster filters by main session directory', async () => {
+test('AgentManager getRoster includes subagents in artifacts directory and excludes parked agents from other sessions', async () => {
   const manager = new AgentManager(process.cwd());
   await manager.init();
-  const roster = manager.getRoster();
-  expect(Array.isArray(roster)).toBe(true);
-});
 
-test('getRoster returns only Main when mainSession.sessionFile is undefined', async () => {
-  const manager = new AgentManager(process.cwd());
-  await manager.init();
-  // Mock mainSession without sessionFile
-  Object.defineProperty(manager.mainSession, 'sessionFile', {
-    value: undefined,
-    writable: true,
-    configurable: true,
-  });
-  // Register an extra agent session in global registry
+  const mainFile = manager.mainSession.sessionFile!;
+  expect(mainFile).toBeDefined();
+  const artifactDir = mainFile.slice(0, -'.jsonl'.length);
+
+  // Register a parked subagent for current session in artifacts dir
+  const currentSubFile = `${artifactDir}/SubAgent1.jsonl`;
   manager.registry.register({
-    id: 'ExtraAgent',
-    displayName: 'Extra Agent',
+    id: 'SubAgent1',
+    displayName: 'Sub Agent 1',
     kind: 'task',
+    status: 'parked',
+    sessionFile: currentSubFile,
   });
-  const roster = manager.getRoster();
-  expect(roster.map((r) => r.id)).toEqual(['Main']);
-  manager.registry.unregister('ExtraAgent');
+
+  // Register a parked subagent for a different session
+  manager.registry.register({
+    id: 'OtherSubAgent',
+    displayName: 'Other Sub Agent',
+    kind: 'task',
+    status: 'parked',
+    sessionFile: 'C:/other/path/session/OtherSubAgent.jsonl',
+  });
+
+  try {
+    const roster = manager.getRoster();
+    const ids = roster.map((r) => r.id);
+    expect(ids).toContain('Main');
+    expect(ids).toContain('SubAgent1');
+    expect(ids).not.toContain('OtherSubAgent');
+  } finally {
+    manager.registry.unregister('SubAgent1');
+    manager.registry.unregister('OtherSubAgent');
+  }
 });
 
 test('switchToSession preserves mainSession on failure', async () => {

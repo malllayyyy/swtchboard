@@ -1,12 +1,14 @@
 import EventEmitter from 'events';
-import { dirname } from 'path';
 import {
   AgentRegistry,
   AgentSession,
   createAgentSession,
   SessionManager,
 } from '@oh-my-pi/pi-coding-agent';
-import { ensurePersistedRoster } from '@oh-my-pi/pi-coding-agent/registry/persisted-agents';
+import {
+  ensurePersistedRoster,
+  isCurrentSessionRosterRef,
+} from '@oh-my-pi/pi-coding-agent/registry/persisted-agents';
 import type {
   AgentRosterItem,
   ModelInfo,
@@ -16,6 +18,7 @@ import type {
 export class AgentManager extends EventEmitter {
   public registry = AgentRegistry.global();
   public mainSession!: AgentSession;
+  private rootSessionFile: string | undefined;
   private subscribedSessions = new WeakSet<AgentSession>();
 
   constructor(public cwd: string) {
@@ -37,9 +40,13 @@ export class AgentManager extends EventEmitter {
     this.mainSession = session;
 
     try {
-      await ensurePersistedRoster(this.registry, this.mainSession.sessionFile);
+      this.rootSessionFile =
+        (await ensurePersistedRoster(this.registry, this.mainSession.sessionFile)) ??
+        this.mainSession.sessionFile ??
+        undefined;
     } catch (err) {
       console.warn('Failed to hydrate persisted subagent roster:', err);
+      this.rootSessionFile = this.mainSession.sessionFile ?? undefined;
     }
 
     this.registry.onChange(() => {
@@ -70,28 +77,18 @@ export class AgentManager extends EventEmitter {
   }
 
   getRoster(): AgentRosterItem[] {
-    const mainDir = this.mainSession?.sessionFile
-      ? dirname(this.mainSession.sessionFile)
-      : null;
-
-    const list = this.registry.list();
-    const filtered = mainDir
-      ? list.filter(
-          (ref) =>
-            ref.id === 'Main' ||
-            (ref.sessionFile != null && dirname(ref.sessionFile) === mainDir)
-        )
-      : list.filter((ref) => ref.id === 'Main');
-
-    return filtered.map((ref) => ({
-      id: ref.id,
-      displayName: ref.displayName,
-      status: ref.status,
-      model: ref.history?.resolvedModel || ref.session?.model?.id,
-      cost: ref.history?.metrics?.cost,
-      tokens: ref.history?.metrics?.tokens,
-      activity: ref.activity,
-    }));
+    return this.registry
+      .list()
+      .filter((ref) => isCurrentSessionRosterRef(ref, this.rootSessionFile))
+      .map((ref) => ({
+        id: ref.id,
+        displayName: ref.displayName,
+        status: ref.status,
+        model: ref.history?.resolvedModel || ref.session?.model?.id,
+        cost: ref.history?.metrics?.cost,
+        tokens: ref.history?.metrics?.tokens,
+        activity: ref.activity,
+      }));
   }
 
   async listAllSessions(): Promise<SessionSummary[]> {
@@ -159,9 +156,13 @@ export class AgentManager extends EventEmitter {
     this.cwd = cwd;
 
     try {
-      await ensurePersistedRoster(this.registry, session.sessionFile);
+      this.rootSessionFile =
+        (await ensurePersistedRoster(this.registry, session.sessionFile)) ??
+        session.sessionFile ??
+        undefined;
     } catch (err) {
       console.warn('Failed to hydrate persisted subagent roster:', err);
+      this.rootSessionFile = session.sessionFile ?? undefined;
     }
 
     this.subscribeToNewSessions();
