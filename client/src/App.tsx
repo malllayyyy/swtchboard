@@ -15,12 +15,10 @@ export function App() {
   const subagents = roster.filter(r => r.id !== 'Main');
   const activeSubagents = subagents.filter(r => {
     const status = r.status?.toLowerCase();
-    return status === 'running' || status === 'idle';
+    if (status === 'running' || status === 'idle') return true;
+    return r.lastActivity !== undefined && Date.now() - r.lastActivity < 5 * 60 * 1000;
   });
-  const historicalSubagents = subagents.filter(r => {
-    const status = r.status?.toLowerCase();
-    return status !== 'running' && status !== 'idle';
-  });
+  const historicalSubagents = subagents.filter(r => !activeSubagents.includes(r));
   const activeAgent = roster.find(r => r.id === activeTab);
   const activeMessages = messages[activeTab] || [];
 

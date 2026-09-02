@@ -123,3 +123,33 @@ test("App roster filtering: case-insensitive status handling", () => {
 
   vi.restoreAllMocks();
 });
+test("App roster filtering: parked/aborted agent with recent lastActivity shows in active, old or missing goes to history", () => {
+  const now = Date.now();
+  const dummyRoster = [
+    { id: "Main", displayName: "Main Orchestrator", status: "running" },
+    { id: "sub-1", displayName: "Recently Finished Worker", status: "parked", lastActivity: now - 2 * 60 * 1000 },
+    { id: "sub-2", displayName: "Old Finished Worker", status: "parked", lastActivity: now - 10 * 60 * 1000 },
+    { id: "sub-3", displayName: "No Activity Timestamp Worker", status: "parked" }
+  ];
+
+  vi.spyOn(switchboardModule, "useSwitchboard").mockReturnValue({
+    connected: true,
+    roster: dummyRoster,
+    models: [],
+    messages: {},
+    sessions: [],
+    loadingSessions: false,
+    listSessions: () => {},
+    errors: [],
+    clearErrors: () => {},
+    send: () => {}
+  });
+
+  const html = renderToString(React.createElement(App));
+  expect(html).toContain("Recently Finished Worker");
+  expect(html).toContain("Show history (2)");
+  expect(html).not.toContain("Old Finished Worker");
+  expect(html).not.toContain("No Activity Timestamp Worker");
+
+  vi.restoreAllMocks();
+});
