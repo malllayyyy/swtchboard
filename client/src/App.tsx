@@ -11,6 +11,16 @@ export function App() {
   const [spawnAgent, setSpawnAgent] = useState('scout');
   const [spawnTask, setSpawnTask] = useState('');
   const [showSessionBrowser, setShowSessionBrowser] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const subagents = roster.filter(r => r.id !== 'Main');
+  const activeSubagents = subagents.filter(r => {
+    const status = r.status?.toLowerCase();
+    return status === 'running' || status === 'idle';
+  });
+  const historicalSubagents = subagents.filter(r => {
+    const status = r.status?.toLowerCase();
+    return status !== 'running' && status !== 'idle';
+  });
   const activeAgent = roster.find(r => r.id === activeTab);
   const activeMessages = messages[activeTab] || [];
 
@@ -132,7 +142,17 @@ export function App() {
 
         {/* Right Roster Sidebar */}
         <aside className="roster-pane">
-          <div className="roster-title">ROSTER</div>
+          <div className="roster-header">
+            <div className="roster-title">ROSTER</div>
+            {historicalSubagents.length > 0 && (
+              <button
+                className="roster-history-toggle"
+                onClick={() => setShowHistory(prev => !prev)}
+              >
+                {showHistory ? 'Hide history' : `Show history (${historicalSubagents.length})`}
+              </button>
+            )}
+          </div>
           <div className="roster-cards">
             {/* Main Orchestrator Card */}
             <div
@@ -148,8 +168,8 @@ export function App() {
               </div>
             </div>
 
-            {/* Subagent Cards */}
-            {roster.filter(r => r.id !== 'Main').map(r => {
+            {/* Active Subagent Cards */}
+            {activeSubagents.map(r => {
               const isRunning = r.status?.toLowerCase() === 'running';
               return (
                 <div
@@ -173,6 +193,39 @@ export function App() {
                 </div>
               );
             })}
+
+            {/* Historical Subagent Cards */}
+            {showHistory && historicalSubagents.length > 0 && (
+              <>
+                <div className="roster-history-divider">
+                  <span>HISTORY</span>
+                </div>
+                {historicalSubagents.map(r => {
+                  const isRunning = r.status?.toLowerCase() === 'running';
+                  return (
+                    <div
+                      key={r.id}
+                      className={`roster-card historical ${activeTab === r.id ? 'active' : ''}`}
+                      onClick={() => setActiveTab(r.id)}
+                    >
+                      <div className="card-header">
+                        <span className="card-name">{r.displayName}</span>
+                        <span
+                          className={`status-dot ${isRunning ? 'connected' : 'disconnected'}`}
+                          style={!isRunning ? { backgroundColor: 'var(--status-gray)' } : undefined}
+                          title={r.status}
+                        />
+                      </div>
+                      <div className="card-details">
+                        <span>{r.status || 'idle'} {r.model ? `| ${r.model}` : ''}</span>
+                        <span>Cost: ${(r.cost || 0).toFixed(4)} {r.tokens !== undefined ? `| ${r.tokens} tokens` : ''}</span>
+                        {r.activity && <div className="card-activity" title={r.activity}>{r.activity}</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </div>
 
           <hr className="divider" />
